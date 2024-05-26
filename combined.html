@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload and Reconciliation</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    form {
+      display: grid;
+      grid-gap: 10px;
+    }
+
+    label {
+      font-weight: bold;
+    }
+
+    input[type="file"],
+    input[type="number"] {
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+    }
+
+    button {
+      padding: 10px 20px;
+      background-color: #4CAF50;
+      color: #fff;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    pre {
+      background-color: #f5f5f5;
+      padding: 10px;
+      border-radius: 3px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Upload Spreadsheet</h1>
+    <form id="singleUploadForm" enctype="multipart/form-data">
+      <label for="file">Select a .xlsx file:</label>
+      <p>Only .xlsx files are allowed, convert your .xls file to .xlsx using Save As in excel</p>
+      <input type="file" id="file" name="file" accept=".xlsx" required>
+      <button type="submit">Upload Spreadsheet</button>
+    </form>
+    <pre id="singleOutput"></pre>
+  </div>
+
+  <div class="container">
+    <h1>Reconciliation Upload</h1>
+    <form id="reconciliationForm">
+      <label for="creditFile">Credit File:</label>
+      <p>Select the credit.csv from the zip file</p>
+      <input type="file" id="creditFile" name="creditFile" required>
+
+      <label for="debitFile">Debit File:</label>
+      <p>Select the debit.csv from the zip file</p>
+      <input type="file" id="debitFile" name="debitFile" required>
+
+      <label for="days">Days:</label>
+      <p>Your customers credit period, increase/decrease value if payments are late</p>
+      <input type="number" id="days" name="days" value="7" required>
+
+      <label for="threshold">Threshold:</label>
+      <p>Acceptable limit for difference between credits and debits, lower for accurate results</p>
+      <input type="number" id="threshold" name="threshold" value="1000.0" required>
+
+      <button type="button" onclick="uploadReconciliationFiles()">Reconcile</button>
+    </form>
+    <pre id="reconciliationOutput"></pre>
+    <button id="downloadBtn" style="display: none;">Download Output</button>
+  </div>
+
+  <script>
+    document.getElementById('singleUploadForm').addEventListener('submit', async function(event) {
+      event.preventDefault();
+      const formData = new FormData();
+      formData.append('file', document.getElementById('file').files[0]);
+
+      try {
+        const response = await fetch('http://89.168.111.78:6666/upload', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!response.ok) {
+          throw new Error('Network response was not ok ' + response.statusText);
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = 'processed_files.zip';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+      } catch (error) {
+        document.getElementById('singleOutput').textContent = 'Error: ' + error.message;
+      }
+    });
+
+    async function uploadReconciliationFiles() {
+      const form = document.getElementById('reconciliationForm');
+      const formData = new FormData(form);
+
+      try {
+        const response = await fetch('http://89.168.111.78:6667/upload', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!response.ok) {
+          throw new Error('Network response was not ok ' + response.statusText);
+        }
+
+        const result = await response.text();
+        document.getElementById('reconciliationOutput').textContent = result;
+        document.getElementById('downloadBtn').style.display = 'inline-block';
+      } catch (error) {
+        document.getElementById('reconciliationOutput').textContent = 'Error: ' + error.message;
+        document.getElementById('downloadBtn').style.display = 'none';
+      }
+    }
+
+    document.getElementById('downloadBtn').addEventListener('click', function() {
+      const outputText = document.getElementById('reconciliationOutput').textContent;
+      const downloadLink = document.createElement('a');
+      const file = new Blob([outputText], {type: 'text/plain'});
+      downloadLink.href = URL.createObjectURL(file);
+      downloadLink.download = 'output.txt';
+      downloadLink.click();
+    });
+  </script>
+</body>
+</html>
